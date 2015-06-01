@@ -2,7 +2,7 @@ module SymmetricDominance
 
 export Population, ModelParameters, evolve!, initialize!, reinitialize!, tmrca, nsegsites, distances, spectra
 
-include("genes.jl")
+using ForwardPopGenSims
 
 immutable ModelParameters
     popsize::Int
