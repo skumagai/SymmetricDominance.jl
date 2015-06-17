@@ -1,6 +1,13 @@
 module SymmetricDominance
 
-export Population, ModelParameters, evolve!, initialize!, reinitialize!, tmrca, nsegsites, distances, spectra
+export Population,
+       ModelParameters,
+
+       simulate,
+       tmrca,
+       nsegsites,
+       distances,
+       spectra
 
 using ForwardPopGenSims
 
@@ -57,14 +64,6 @@ function cleandb!{T}(gdb::GeneDB, pop::Population, gids::AbstractArray{T, 2})
     nothing
 end
 
-function getparentids!(ps, n)
-    rand!(ps, 1:n)
-    while ps[1] == ps[2]
-        ps[2] = rand(1:n)
-    end
-    nothing
-end
-
 function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state::Int, t::Int, termon::Int, tclean::Int)
     # unpacking parameters
     n = params.popsize
@@ -72,7 +71,7 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     homofit = params.homozygousfitness
     # The last element is just there as a placeholder, and its value does not affect runs.
     recombs = [params.recombinationrates; 0.0]
-    muts = params.mutationrates
+    muts = [params.mutationrates params.mutationrates]
     nloci = params.numberofloci
 
     # normalize mutation rates
@@ -96,11 +95,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     for gen = 1:t
         for i = 1:n # iterate over offspring
             while true
-                getparentids!(ps, n)
+                selectparens!(ps, n)
                 # determine if mutations occur.
-                for locus = 1:nloci, chr = 1:2
-                    mutarray[locus, chr] = rand() < muts[locus] ? true : false
-                end
+                selectmutatedsites!(mutarray, muts, replace=false)
                 # process the first locus, which is under selection. A offspring is homozygous only when it
                 # inherits identical-by-state genes from both parents without mutation. Otherwise, the offspring
                 # is heterozygous.
@@ -167,7 +164,7 @@ function reinitialize!(oldgdb::GeneDB, pop::Population)
         end
         org[locus, chr] = insert!(gdb, GeneRecord(0, smap[state]))
     end
-    gdb
+    gdb, smax - 1
 end
 
 function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int)
@@ -183,7 +180,7 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int)
 
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
-    gdb = reinitialize!(pop, gdb)
+    gdb, state = reinitialize!(pop, gdb)
     pop, state, t = evolve!(gdb, pop, params, state, t, termon)
     pop, gdb, t
 end
