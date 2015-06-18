@@ -44,11 +44,12 @@ Base.getindex(pop::Population, orgid::Int) = pop.data[orgid]
 Base.getindex(pop::Population, orgid::Int, locus::Int, chr::Int) = pop.data[orgid].geneids[locus, chr]
 Base.setindex!(pop::Population, val::Int, orgid::Int, locus::Int, chr::Int) = pop[orgid][locus, chr] = val
 
-function getgenes!(gids::AbstractArray, pop::Population, loci::Int)
+function getgenes!(gids::AbstractArray, pop::Population, locus::Int)
     length(gids) == length(pop) * 2 || error("length(gene array) != 2 * population size")
     i = 1
     for org in pop, chr = 1:2
         gids[i] = org[locus, chr]
+        i += 1
     end
     nothing
 end
@@ -84,9 +85,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     for gen = 1:t
         for i = 1:n # iterate over offspring
             while true
-                selectparens!(ps, n)
+                selectparents!(ps, n)
                 # determine if mutations occur.
-                selectmutatedsites!(mutarray, muts, replace=false)
+                selectmutatedsites!(mutarray, muts)
                 # process the first locus, which is under selection. A offspring is homozygous only when it
                 # inherits identical-by-state genes from both parents without mutation. Otherwise, the offspring
                 # is heterozygous.
@@ -124,9 +125,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         if termon == minimum(ncoals)
             break
         end
-        gen % tclean == 0 && cleandb!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
+        gen % tclean == 0 && clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
     end
-    cleandb!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
+    clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
     parpop, state, gen
 end
 
@@ -156,7 +157,7 @@ function reinitialize!(oldgdb::GeneDB, pop::Population)
     gdb, smax - 1
 end
 
-function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int)
+function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int)
 
     # This is a parental population, a population of offspring is created within evolve! function.
     pop = Population(params.popsize, params.numberofloci)
@@ -165,12 +166,12 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int)
     # Execute the exact-same sequence as main-loop of evolution and throws out lineage information afterwords.
     # This loop runs exacctly "burnin" generations regardless of the presence of coalescence.
     gdb, state = initialize!(pop) # all genes are distinct
-    pop, state, t = evolve!(gdb, pop, params, state, burnin, -1)
+    pop, state, t = evolve!(gdb, pop, params, state, burnin, -1, tclean)
 
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
-    gdb, state = reinitialize!(pop, gdb)
-    pop, state, t = evolve!(gdb, pop, params, state, t, termon)
+    gdb, state = reinitialize!(gdb, pop)
+    pop, state, t = evolve!(gdb, pop, params, state, t, termon, tclean)
     pop, gdb, t
 end
 
