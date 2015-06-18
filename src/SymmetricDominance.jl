@@ -9,7 +9,7 @@ export Population,
        distances,
        spectra
 
-using ForwardPopGenSims
+using ForwardPopGenSimulations
 
 immutable ModelParameters
     popsize::Int

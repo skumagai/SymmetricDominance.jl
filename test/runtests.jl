@@ -1,7 +1,7 @@
 import SymmetricDominance
 using Base.Test
 
-const fpgs = ForwardPopGenSims
+const fpgs = ForwardPopGenSimulations
 const sd = SymmetricDominance
 
 gdb = fpgs.GeneDB()
