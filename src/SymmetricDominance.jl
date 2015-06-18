@@ -53,17 +53,6 @@ function getgenes!(gids::AbstractArray, pop::Population, loci::Int)
     nothing
 end
 
-function cleandb!{T}(gdb::GeneDB, pop::Population, gids::AbstractArray{T, 2})
-    n = length(pop)
-    nl = nloci(pop)
-    size(gids) == (2 * n, nl) || error("Dimension mismatch")
-    for locus = 1:nloci
-        getgenes!(sub(gids, :, locus), pop, locus)
-    end
-    clean!(gdb, gids)
-    nothing
-end
-
 function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state::Int, t::Int, termon::Int, tclean::Int)
     # unpacking parameters
     n = params.popsize
@@ -89,9 +78,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     chpop = Population(n, nloci)
 
     gids = Array{Int}(2 * n)
-    allgids = Array{Int}(2 * n, nloci)
+    nnewids = 2 * n * nloci
 
-    gen = 1 # current generation
+    gen = 0 # current generation
     for gen = 1:t
         for i = 1:n # iterate over offspring
             while true
@@ -135,9 +124,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         if termon == minimum(ncoals)
             break
         end
-        gen % tclean == 0 && cleandb!(gdb, parpop, allgids)
+        gen % tclean == 0 && cleandb!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
     end
-    cleandb!(gdb, parpop, allgids)
+    cleandb!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
     parpop, state, gen
 end
 
