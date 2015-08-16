@@ -16,4 +16,4 @@ params = ModelParameters(
 
 pop, genes, t = simulate(params, 5000, 30000, 3, 100)
 
-@save file pop genes t
+@save filename pop genes t
