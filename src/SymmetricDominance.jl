@@ -55,6 +55,9 @@ function getgenes!(gids::AbstractArray, pop::Population, locus::Int)
 end
 
 function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state::Int, t::Int, termon::Int, tclean::Int)
+
+    info("evolution started on ", now(), ".")
+
     # unpacking parameters
     n = params.popsize
     heterofit = params.heterozygousfitness
@@ -128,6 +131,13 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         gen % tclean == 0 && clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
     end
     clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
+
+    if termon == minimum(ncoals)
+        info("evolution terminated by number of turn-overs in gen ", gen, " on ", now(), ".")
+    else
+        info("evolution terminated by reaching max gen", gen, " on ", now(), ".")
+    end
+
     parpop, state, gen
 end
 
@@ -158,6 +168,7 @@ function reinitialize!(oldgdb::GeneDB, pop::Population)
 end
 
 function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int)
+    info("process started on ", now(), ".")
 
     # This is a parental population, a population of offspring is created within evolve! function.
     pop = Population(params.popsize, params.numberofloci)
@@ -172,6 +183,7 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tcl
     # This loop terminates upon the first coalescence or after "t" generations.
     gdb, state = reinitialize!(gdb, pop)
     pop, state, t = evolve!(gdb, pop, params, state, t, termon, tclean)
+    info("process terminated on ", now(), ".")
     pop, gdb, t
 end
 
