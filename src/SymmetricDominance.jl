@@ -167,7 +167,7 @@ function reinitialize!(oldgdb::GeneDB, pop::Population)
     gdb, smax - 1
 end
 
-function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int)
+function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int, rep=1)
     info("process started on ", now(), ".")
 
     # This is a parental population, a population of offspring is created within evolve! function.
@@ -179,12 +179,18 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tcl
     gdb, state = initialize!(pop) # all genes are distinct
     pop, state, t = evolve!(gdb, pop, params, state, burnin, -1, tclean)
 
+    datastore = Array{Tuple{typeof(pops), typeof(db(core)), typeof(time(core))}}(0)
+
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
-    gdb, state = reinitialize!(gdb, pop)
-    pop, state, t = evolve!(gdb, pop, params, state, t, termon, tclean)
+    for _ = 1:rep
+        pop = deepcopy(pop)
+        gdb, state = reinitialize!(gdb, pop)
+        pop, state, t = evolve!(gdb, pop, params, state, t, termon, tclean)
+        push!(datastore, (pop, gdb, t))
+    end
     info("process terminated on ", now(), ".")
-    pop, gdb, t
+    datastore
 end
 
 function toarray(gdb::GeneDB, pop::Population, field::Symbol)
