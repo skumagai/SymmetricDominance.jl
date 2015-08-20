@@ -104,11 +104,12 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
                 end
 
                 for par = 1:2,  locus = 1:nloci
+                    pid = parpop[ps[par], locus, parchrs[par]]
                     if mutarray[locus, par]
-                        chpop[i, locus, par] = transmit!(gdb, gen, state, parpop[ps[par], locus, parchrs[par]])
+                        chpop[i, locus, par] = transmit!(gdb, gen, pid, state=state)
                         state += 1
                     else
-                        chpop[i, locus, par] = transmit!(gdb, gen, parpop[ps[par], locus, parchrs[par]])
+                        chpop[i, locus, par] = transmit!(gdb, gen, pid)
                     end
                     parchrs[par] = rand() < recombs[locus] ? 3 - parchrs[par] : parchrs[par]
                 end
