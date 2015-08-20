@@ -14,6 +14,6 @@ params = ModelParameters(
     [0.000001, 0.000001, 0.000001] # Per-locus mutation rate per-generation
 )
 
-pop, genes, t = simulate(params, 5000, 30000, 3, 100)
+results  = simulate(params, 5000, 30000, 3, 100)
 
-@save filename pop genes t
+@save filename results
