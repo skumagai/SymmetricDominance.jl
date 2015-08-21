@@ -18,10 +18,10 @@ for _ = 1:2
     sd.insert!(gdb, sd.GeneRecord(1, nextstate!(sc)))
 end
 for i = 1:2, _ = 1:2
-    sd.insert!(gdb, sd.GeneRecord(2, nextstate!(sc), gdb[i]))
+    sd.insert!(gdb, sd.GeneRecord(2, gdb[i], state=nextstate!(sc)))
 end
 for i = 3:6, _ = 1:2
-    sd.insert!(gdb, sd.GeneRecord(3, nextstate!(sc), gdb[i]))
+    sd.insert!(gdb, sd.GeneRecord(3, gdb[i], state=nextstate!(sc)))
 end
 sd.insert!(gdb, sd.GeneRecord(4, gdb[1]))
 
