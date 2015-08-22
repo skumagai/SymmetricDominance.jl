@@ -136,7 +136,7 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     if termon == minimum(ncoals)
         info("evolution terminated by number of turn-overs in gen ", gen, " on ", now(), ".")
     else
-        info("evolution terminated by reaching max gen", gen, " on ", now(), ".")
+        info("evolution terminated by reaching max gen ", gen, " on ", now(), ".")
     end
 
     parpop, state, gen
@@ -180,7 +180,7 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tcl
     gdb, state = initialize!(pop) # all genes are distinct
     pop, state, t = evolve!(gdb, pop, params, state, burnin, -1, tclean)
 
-    datastore = Array{Tuple{typeof(pops), typeof(db(core)), typeof(time(core))}}(0)
+    datastore = Array{Tuple{typeof(pop), typeof(db(core)), typeof(time(core))}}(0)
 
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
