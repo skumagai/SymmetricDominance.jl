@@ -134,7 +134,7 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
 
     if termon == minimum(ncoals)
-        info("evolution terminated by number of turn-overs in gen ", gen, " on ", now(), ".")
+        info("evolution terminated by reaching the min # of turn-overs in gen ", gen, " on ", now(), ".")
     else
         info("evolution terminated by reaching max gen ", gen, " on ", now(), ".")
     end
