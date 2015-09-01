@@ -178,17 +178,17 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tcl
     # Execute the exact-same sequence as main-loop of evolution and throws out lineage information afterwords.
     # This loop runs exacctly "burnin" generations regardless of the presence of coalescence.
     gdb, state = initialize!(pop) # all genes are distinct
-    pop, state, t = evolve!(gdb, pop, params, state, burnin, -1, tclean)
+    pop, state, telapsed = evolve!(gdb, pop, params, state, burnin, -1, tclean)
 
-    datastore = Array{Tuple{typeof(pop), typeof(db(core)), typeof(time(core))}}(0)
+    datastore = Array{Tuple{typeof(pop), typeof(gdb), typeof(telapsed)}}(0)
 
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
     for _ = 1:rep
         pop = deepcopy(pop)
         gdb, state = reinitialize!(gdb, pop)
-        pop, state, t = evolve!(gdb, pop, params, state, t, termon, tclean)
-        push!(datastore, (pop, gdb, t))
+        pop, state, telapsed = evolve!(gdb, pop, params, state, t, termon, tclean)
+        push!(datastore, (pop, gdb, telapsed))
     end
     info("process terminated on ", now(), ".")
     datastore
