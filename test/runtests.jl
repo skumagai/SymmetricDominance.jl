@@ -25,14 +25,11 @@ for i = 3:6, _ = 1:2
 end
 sd.insert!(gdb, sd.GeneRecord(4, gdb[1]))
 
-const o = sd.Organism(3)
-@test sd.nloci(o) == 3
-
 for i = 1:15
     gdb[i].state += 10
 end
 
-pop = sd.Population(2, 1)
+pop = sd.Population(2, 1, 2)
 pop[1, 1, 1] = 7
 pop[2, 1, 1] = 8
 pop[1, 1, 2] = 9

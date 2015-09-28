@@ -20,41 +20,12 @@ immutable ModelParameters
     mutationrates::Vector{Float64}
 end
 
-immutable Organism
-    geneids::Matrix{Int}
-    Organism(nloci::Int) = new(Array{Int}(nloci, 2))
-end
-
-immutable Population
-    data::Vector{Organism}
-    Population(n::Int, nloci::Int) = new([Organism(nloci) for _ = 1:n])
-end
-
-Base.start(pop::Population) = start(pop.data)
-Base.next(pop::Population, iter) = next(pop.data, iter)
-Base.done(pop::Population, iter) = done(pop.data, iter)
-Base.length(pop::Population) = length(pop.data)
-
-nloci(pop::Population) = size(pop[1].geneids, 1)
-nloci(org::Organism) = size(org.geneids, 1)
-
-Base.getindex(org::Organism, locus::Int, chr::Int) = org.geneids[locus, chr]
-Base.setindex!(org::Organism, val::Int, locus::Int, chr::Int) = org.geneids[locus, chr] = val
-Base.getindex(pop::Population, orgid::Int) = pop.data[orgid]
-Base.getindex(pop::Population, orgid::Int, locus::Int, chr::Int) = pop.data[orgid].geneids[locus, chr]
-Base.setindex!(pop::Population, val::Int, orgid::Int, locus::Int, chr::Int) = pop[orgid][locus, chr] = val
-
-function getgenes!(gids::AbstractArray, pop::Population, locus::Int)
-    length(gids) == length(pop) * 2 || error("length(gene array) != 2 * population size")
-    i = 1
-    for org in pop, chr = 1:2
-        gids[i] = org[locus, chr]
-        i += 1
-    end
-    nothing
-end
-
-function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state::Int, t::Int, termon::Int, tclean::Int)
+function evolve!(
+    core::BasicData,
+    parpop::Population,
+    params::ModelParameters,
+    termon::Int,
+    tclean::Int)
 
     info("evolution started on ", now(), ".")
 
@@ -79,13 +50,13 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
     ncoals = [0 for _ = 1:nloci]
     lastcoals = [0 for _ = 1:nloci]
 
-    chpop = Population(n, nloci)
+    chpop = deepcopy(parpop)
 
     gids = Array{Int}(2 * n)
     nnewids = 2 * n * nloci
 
     gen = 0 # current generation
-    for gen = 1:t
+    for gen = core
         for i = 1:n # iterate over offspring
             while true
                 selectparents!(ps, n)
@@ -95,7 +66,7 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
                 # inherits identical-by-state genes from both parents without mutation. Otherwise, the offspring
                 # is heterozygous.
                 rand!(parchrs, 1:2)
-                if isidbystate(gdb, parpop[ps[1], 1, parchrs[1]], parpop[ps[2], 1, parchrs[2]]) &&
+                if isidbystate(db(core), parpop[ps[1], 1, parchrs[1]], parpop[ps[2], 1, parchrs[2]]) &&
                     mutarray[1,1] == mutarray[1,2] == false
 
                     rand() > homofit && continue
@@ -106,10 +77,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
                 for par = 1:2,  locus = 1:nloci
                     pid = parpop[ps[par], locus, parchrs[par]]
                     if mutarray[locus, par]
-                        chpop[i, locus, par] = transmit!(gdb, gen, pid, state=state)
-                        state += 1
+                        chpop[i, locus, par] = transmit!(db(core), gen, pid, state=nextstate!(core))
                     else
-                        chpop[i, locus, par] = transmit!(gdb, gen, pid)
+                        chpop[i, locus, par] = transmit!(db(core), gen, pid)
                     end
                     parchrs[par] = rand() < recombs[locus] ? 3 - parchrs[par] : parchrs[par]
                 end
@@ -118,8 +88,7 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         end
         parpop, chpop = chpop, parpop
         for locus in 1:nloci
-            getgenes!(gids, parpop, locus)
-            anc = mrca(gdb, gids)
+            anc = mrca(db(core), locus, parpop)
             if anc.epoch > lastcoals[locus]
                 lastcoals[locus] = anc.epoch
                 ncoals[locus] += 1
@@ -129,9 +98,9 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         if termon == minimum(ncoals)
             break
         end
-        gen % tclean == 0 && clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
+        gen % tclean == 0 && clean!(db(core), nnewids * gen + 1, nnewids * (gen + 1))
     end
-    clean!(gdb, nnewids * gen + 1, nnewids * (gen + 1))
+    clean!(db(core), nnewids * gen + 1, nnewids * (gen + 1))
 
     if termon == minimum(ncoals)
         info("evolution terminated by reaching the min # of turn-overs in gen ", gen, " on ", now(), ".")
@@ -139,112 +108,36 @@ function evolve!(gdb::GeneDB, parpop::Population, params::ModelParameters, state
         info("evolution terminated by reaching max gen ", gen, " on ", now(), ".")
     end
 
-    parpop, state, gen
-end
-
-function initialize!(pop::Population)
-    # Initialize a parental population. Genes are distinct.
-    gdb = GeneDB()
-    state = 1
-    for org in pop, locus = 1:nloci(pop), chr = 1:2
-        org[locus, chr] = insert!(gdb, GeneRecord(0, state))
-        state += 1
-    end
-    gdb, state
-end
-
-function reinitialize!(oldgdb::GeneDB, pop::Population)
-    gdb = GeneDB()
-    smap = Dict{Int, Int}()
-    smax = 1
-    for org in pop, locus = 1:nloci(pop), chr = 1:2
-        state = oldgdb[org[locus, chr]].state
-        if !haskey(smap, state)
-            smap[state] = smax
-            smax += 1
-        end
-        org[locus, chr] = insert!(gdb, GeneRecord(0, smap[state]))
-    end
-    gdb, smax - 1
+    parpop, core
 end
 
 function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int, rep=1)
     info("process started on ", now(), ".")
+    core = BasicData()
 
     # This is a parental population, a population of offspring is created within evolve! function.
-    pop = Population(params.popsize, params.numberofloci)
+    pop = Population(params.popsize, params.numberofloci, 2)
 
     # Burnin
     # Execute the exact-same sequence as main-loop of evolution and throws out lineage information afterwords.
     # This loop runs exacctly "burnin" generations regardless of the presence of coalescence.
-    gdb, state = initialize!(pop) # all genes are distinct
-    pop, state, telapsed = evolve!(gdb, pop, params, state, burnin, -1, tclean)
+    initialize!(core, pop) # all genes are distinct
+    settmax!(core, burnin)
+    pop, core = evolve!(core, pop, params, -1, tclean)
 
-    datastore = Array{Tuple{typeof(pop), typeof(gdb), typeof(telapsed)}}(0)
+    datastore = Array{Tuple{typeof(pop), typeof(db(core)), typeof(time(core))}}(0)
 
     # Main loop of evolution
     # This loop terminates upon the first coalescence or after "t" generations.
     for _ = 1:rep
         pop = deepcopy(pop)
-        gdb, state = reinitialize!(gdb, pop)
-        pop, state, telapsed = evolve!(gdb, pop, params, state, t, termon, tclean)
-        push!(datastore, (pop, gdb, telapsed))
+        core = reinitialize!(core, pop)
+        settmax!(core, t)
+        pop, core = evolve!(core, pop, params, termon, tclean)
+        push!(datastore, (pop, db(core), time(core)))
     end
     info("process terminated on ", now(), ".")
     datastore
-end
-
-function toarray(gdb::GeneDB, pop::Population, field::Symbol)
-    [getfield(gdb[org[locus, chr]], field) for org in pop, locus = 1:nloci(pop), chr = 1:2]
-end
-
-function counts(gdb::GeneDB, pop::Population)
-    alleles = toarray(gdb, pop, :state)
-    nl = nloci(pop)
-    # allele count
-    adata = [Dict{Int, Int}() for _ = 1:nl]
-    # genotype count
-    gdata = [Dict{NTuple{2, Int}, Int}() for _ = 1:nl]
-    # haplotype count
-    hdata = Dict{NTuple{nl, Int}, Int}()
-    for org in 1:length(pop)
-        for locus = 1:nl
-            g = tuple(sort(vec(alleles[org, locus, :]))...)
-            gdata[locus][g] = get(gdata[locus], g, 0) + 1
-            for chr = 1:2
-                a = alleles[org, locus, chr]
-                adata[locus][a] = get(adata[locus], a, 0) + 1
-            end
-        end
-        for chr = 1:2
-            h = tuple(vec(alleles[org, :, chr])...)
-            hdata[h] = get(hdata, h, 0) + 1
-        end
-    end
-    adata, gdata, hdata
-end
-
-function spectra(gdb::GeneDB, pop::Population)
-    adata, gdata, hdata = counts(gdb, pop)
-
-    nl = nloci(pop)
-    afs = [Dict{Int, Int}() for _ = 1:nl]
-    gfs = [Dict{Int, Int}() for _ = 1:nl]
-    hfs = Dict{Int, Int}()
-    for locus = 1:nl
-        for v in values(adata[locus])
-            afs[locus][v] = get(afs[locus], v, 0) + 1
-        end
-    end
-    for locus = 1:nl
-        for v in values(gdata[locus])
-            gfs[locus][v] = get(gfs[locus], v, 0) + 1
-        end
-    end
-    for v in values(hdata)
-        hfs[v] = get(hfs, v, 0) + 1
-    end
-    afs, gfs, hfs
 end
 
 end
