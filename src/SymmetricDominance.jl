@@ -1,29 +1,22 @@
 module SymmetricDominance
 
 export Population,
-       ModelParameters,
 
-       simulate,
+       startsimulation,
        tmrca,
        nsegsites,
        distances,
        spectra
 
 using ForwardPopGenSimulations
+import JLD
 
-immutable ModelParameters
-    popsize::Int
-    numberofloci::Int
-    heterozygousfitness::Float64
-    homozygousfitness::Float64
-    recombinationrates::Vector{Float64}
-    mutationrates::Vector{Float64}
-end
+include("params.jl")
 
 function evolve!(
     core::BasicData,
     parpop::Population,
-    params::ModelParameters,
+    params::Parameters,
     termon::Int,
     tclean::Int)
 
@@ -31,12 +24,12 @@ function evolve!(
 
     # unpacking parameters
     n = params.popsize
-    heterofit = params.heterozygousfitness
-    homofit = params.homozygousfitness
+    heterofit = params.fithet
+    homofit = params.fithom
     # The last element is just there as a placeholder, and its value does not affect runs.
-    recombs = [params.recombinationrates; 0.0]
-    muts = [params.mutationrates params.mutationrates]
-    nloci = params.numberofloci
+    recombs = [params.recrate; 0.0]
+    muts = [params.mutrate params.mutrate]
+    nloci = params.nloci
 
     # normalize mutation rates
     maxfit = max(heterofit, homofit)
@@ -111,12 +104,18 @@ function evolve!(
     parpop, core
 end
 
-function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tclean::Int, rep=1)
+function simulate(params::Parameters)
     info("process started on ", now(), ".")
     core = BasicData()
 
+    burnin = params.burnin
+    t = params.tmax
+    termon = params.coalterm
+    rep = params.repeat
+    tclean = params.tclean
+
     # This is a parental population, a population of offspring is created within evolve! function.
-    pop = Population(params.popsize, params.numberofloci, 2)
+    pop = Population(params.popsize, params.nloci, 2)
 
     # Burnin
     # Execute the exact-same sequence as main-loop of evolution and throws out lineage information afterwords.
@@ -138,6 +137,18 @@ function simulate(params::ModelParameters, burnin::Int, t::Int, termon::Int, tcl
     end
     info("process terminated on ", now(), ".")
     datastore
+end
+
+function startsimulation(path)
+    conf = loadparams(path)
+
+    sttime = Dates.format(now(), "yyyy-m-d-H-M")
+    hostname = chomp(readall(`hostname`))
+    filename = "result.$hostname.$sttime.jld"
+
+    results  = simulate(conf)
+
+    JLD.@save filename results
 end
 
 end

@@ -1,0 +1,13 @@
+---
+burn in: 10
+simulated generations: 100
+terminate: 3
+clean up frequency: 10
+repeat: 1
+number of loci: 3
+population size: 100
+fitness of homozygotes: 0.9
+fitness of heterozygotes: 0.8
+mutation rates: [0.01, 0.02, 0.03]
+recombination rates: [0.02, 0.4]
+...
